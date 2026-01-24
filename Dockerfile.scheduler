@@ -1,0 +1,9 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
+
+RUN pip install pika
+COPY scheduler/main.py .
+
+CMD ["python", "-u", "main.py"]

@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: actor-service
+  namespace: local-infra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: actor
+  template:
+    metadata:
+      labels:
+        app: actor
+    spec:
+      containers:
+      - name: actor
+        image: actor:local
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"

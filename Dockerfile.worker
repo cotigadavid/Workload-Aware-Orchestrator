@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
+
+RUN pip install pika
+COPY workers/*.py ./
+
+ARG WORKER_SCRIPT=actor_worker.py
+ENV WORKER_SCRIPT=${WORKER_SCRIPT}
+
+CMD ["sh", "-c", "python -u ${WORKER_SCRIPT}"]
