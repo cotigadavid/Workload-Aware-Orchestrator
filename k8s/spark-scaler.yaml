@@ -1,0 +1,16 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: spark-worker-scaler
+  namespace: local-infra
+spec:
+  scaleTargetRef:
+    name: spark-worker
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  triggers:
+  - type: azure-servicebus
+    metadata:
+      queueName: spark-jobs
+      messageCount: "3"
+      connectionFromEnv: SERVICEBUS_CONNECTION_STRING

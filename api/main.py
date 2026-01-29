@@ -1,13 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-import pika
+from azure.servicebus import ServiceBusClient, ServiceBusMessage
 import json
 import uuid
+import os
 
 app = FastAPI()
 
-RABBITMQ_URL = "amqp://guest:guest@rabbitmq:5672/"
+SERVICEBUS_CONNECTION_STRING = os.getenv("SERVICEBUS_CONNECTION_STRING")
 
 class JobPayload(BaseModel):
     rows: Optional[int] = 1000
@@ -25,17 +26,11 @@ def submit_job(payload: JobPayload):
         "payload": payload.dict()
     }
     
-    conn = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
-    ch = conn.channel()
-    ch.queue_declare(queue="jobqueue", durable=True)
-    
-    ch.basic_publish(
-        exchange="",
-        routing_key="jobqueue",
-        body=json.dumps(job),
-        properties=pika.BasicProperties(delivery_mode=2)
-    )
-    conn.close()
+    with ServiceBusClient.from_connection_string(SERVICEBUS_CONNECTION_STRING) as client:
+        sender = client.get_queue_sender(queue_name="jobqueue")
+        with sender:
+            message = ServiceBusMessage(json.dumps(job))
+            sender.send_messages(message)
     
     return {
         "status": "submitted",
@@ -49,20 +44,19 @@ def health():
 @app.get("/queues/status")
 def queue_status():
     try:
-        conn = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
-        ch = conn.channel()
+        from azure.servicebus.management import ServiceBusAdministrationClient
         
+        admin_client = ServiceBusAdministrationClient.from_connection_string(SERVICEBUS_CONNECTION_STRING)
         queues = ["jobqueue", "actor-jobs", "spark-jobs", "ml-jobs", "batch-jobs"]
         status = {}
         
         for queue in queues:
             try:
-                result = ch.queue_declare(queue=queue, durable=True, passive=True)
-                status[queue] = result.method.message_count
+                queue_props = admin_client.get_queue_runtime_properties(queue)
+                status[queue] = queue_props.total_message_count
             except:
                 status[queue] = 0
         
-        conn.close()
         return status
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

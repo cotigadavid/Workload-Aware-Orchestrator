@@ -20,13 +20,21 @@ spec:
     spec:
       containers:
       - name: api
-        image: localhost:5000/cloud-api:latest
-        imagePullPolicy: Never
+        image: <ACR_LOGIN_SERVER>/cloud-api:latest
+        imagePullPolicy: Always
         ports:
           - containerPort: 8000
         env:
-          - name: RABBITMQ_URL
-            value: "amqp://guest:guest@rabbitmq:5672/"
+          - name: SERVICEBUS_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: servicebus-conn
+                key: SERVICEBUS_CONNECTION_STRING
+          - name: AZURE_STORAGE_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: storage-conn
+                key: AZURE_STORAGE_CONNECTION_STRING
 ---
 apiVersion: v1
 kind: Service
@@ -59,11 +67,19 @@ spec:
     spec:
       containers:
       - name: scheduler
-        image: localhost:5000/cloud-scheduler:latest
-        imagePullPolicy: Never
+        image: <ACR_LOGIN_SERVER>/cloud-scheduler:latest
+        imagePullPolicy: Always
         env:
-          - name: RABBITMQ_URL
-            value: "amqp://guest:guest@rabbitmq:5672/"
+          - name: SERVICEBUS_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: servicebus-conn
+                key: SERVICEBUS_CONNECTION_STRING
+          - name: AZURE_STORAGE_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: storage-conn
+                key: AZURE_STORAGE_CONNECTION_STRING
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -82,11 +98,19 @@ spec:
     spec:
       containers:
       - name: worker
-        image: localhost:5000/cloud-actor-worker:latest
-        imagePullPolicy: Never
+        image: <ACR_LOGIN_SERVER>/cloud-actor-worker:latest
+        imagePullPolicy: Always
         env:
-          - name: RABBITMQ_URL
-            value: "amqp://guest:guest@rabbitmq:5672/"
+          - name: SERVICEBUS_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: servicebus-conn
+                key: SERVICEBUS_CONNECTION_STRING
+          - name: AZURE_STORAGE_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: storage-conn
+                key: AZURE_STORAGE_CONNECTION_STRING
         resources:
           requests:
             memory: "256Mi"
@@ -112,11 +136,19 @@ spec:
     spec:
       containers:
       - name: worker
-        image: localhost:5000/cloud-spark-worker:latest
-        imagePullPolicy: Never
+        image: <ACR_LOGIN_SERVER>/cloud-spark-worker:latest
+        imagePullPolicy: Always
         env:
-          - name: RABBITMQ_URL
-            value: "amqp://guest:guest@rabbitmq:5672/"
+          - name: SERVICEBUS_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: servicebus-conn
+                key: SERVICEBUS_CONNECTION_STRING
+          - name: AZURE_STORAGE_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: storage-conn
+                key: AZURE_STORAGE_CONNECTION_STRING
         resources:
           requests:
             memory: "1Gi"

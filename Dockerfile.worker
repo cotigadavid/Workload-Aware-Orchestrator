@@ -3,7 +3,7 @@ FROM python:3.11-slim
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 
-RUN pip install pika
+RUN pip install azure-servicebus
 COPY workers/*.py ./
 
 ARG WORKER_SCRIPT=actor_worker.py

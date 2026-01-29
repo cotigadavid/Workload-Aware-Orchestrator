@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN pip install fastapi uvicorn pika
+RUN pip install fastapi uvicorn azure-servicebus
 
 COPY api/main.py .
 

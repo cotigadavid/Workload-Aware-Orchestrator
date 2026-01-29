@@ -1,28 +1,28 @@
-import pika
+from azure.servicebus import ServiceBusClient, ServiceBusMessage
 import json
 import time
 import sys
 import os
 
-RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
+SERVICEBUS_CONNECTION_STRING = os.getenv("SERVICEBUS_CONNECTION_STRING")
 MAX_RETRIES = 10
 RETRY_DELAY = 5
 
 def connect_with_retry():
-    """Connect to RabbitMQ with retries"""
+    """Connect to Service Bus with retries"""
     for attempt in range(MAX_RETRIES):
         try:
-            print(f"[SCHEDULER] Attempting to connect to RabbitMQ (attempt {attempt + 1}/{MAX_RETRIES})...")
-            connection = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
-            print("[SCHEDULER] Successfully connected to RabbitMQ")
-            return connection
+            print(f"[SCHEDULER] Attempting to connect to Service Bus (attempt {attempt + 1}/{MAX_RETRIES})...", flush=True)
+            client = ServiceBusClient.from_connection_string(SERVICEBUS_CONNECTION_STRING)
+            print("[SCHEDULER] Successfully connected to Service Bus", flush=True)
+            return client
         except Exception as e:
-            print(f"[SCHEDULER] Connection failed: {e}")
+            print(f"[SCHEDULER] Connection failed: {e}", flush=True)
             if attempt < MAX_RETRIES - 1:
-                print(f"[SCHEDULER] Retrying in {RETRY_DELAY} seconds...")
+                print(f"[SCHEDULER] Retrying in {RETRY_DELAY} seconds...", flush=True)
                 time.sleep(RETRY_DELAY)
             else:
-                print("[SCHEDULER] Max retries reached. Exiting.")
+                print("[SCHEDULER] Max retries reached. Exiting.", flush=True)
                 sys.exit(1)
 
 def estimate_cost(job: dict):
@@ -50,45 +50,46 @@ def classify(job: dict) -> str:
     else:
         return "batch-jobs"
 
-def route_job(ch, job: dict, target_queue: str):
+def route_job(client, job: dict, target_queue: str):
     """Route job to the appropriate queue"""
-    ch.queue_declare(queue=target_queue, durable=True)
-    ch.basic_publish(
-        exchange="",
-        routing_key=target_queue,
-        body=json.dumps(job),
-        properties=pika.BasicProperties(delivery_mode=2)
-    )
-    print(f"[SCHEDULER] Routed job to {target_queue}: {job.get('job_id', 'unknown')}")
+    sender = client.get_queue_sender(queue_name=target_queue)
+    with sender:
+        message = ServiceBusMessage(json.dumps(job))
+        sender.send_messages(message)
+    print(f"[SCHEDULER] Routed job to {target_queue}: {job.get('job_id', 'unknown')}", flush=True)
 
-def callback(ch, method, properties, body):
-    job = json.loads(body)
-    print(f"[SCHEDULER] Scheduling job: {job.get('job_id', 'unknown')}")
+def process_message(client, msg):
+    job = json.loads(str(msg))
+    print(f"[SCHEDULER] Scheduling job: {job.get('job_id', 'unknown')}", flush=True)
     
     # Classify and route the job
     target_queue = classify(job)
-    print(f"[SCHEDULER] Classification: {target_queue} (score: {estimate_cost(job):.2f})")
-    route_job(ch, job, target_queue)
-    
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+    print(f"[SCHEDULER] Classification: {target_queue} (score: {estimate_cost(job):.2f})", flush=True)
+    route_job(client, job, target_queue)
 
 def main():
-    print("[SCHEDULER] Starting scheduler...")
-    print(f"[SCHEDULER] RabbitMQ URL: {RABBITMQ_URL}")
+    print("[SCHEDULER] Starting scheduler...", flush=True)
+    print(f"[SCHEDULER] Service Bus connection configured", flush=True)
     
-    conn = connect_with_retry()
-    ch = conn.channel()
-    ch.queue_declare(queue="jobqueue", durable=True)
-    ch.basic_qos(prefetch_count=1)
-    ch.basic_consume(queue="jobqueue", on_message_callback=callback, auto_ack=False)
-
-    print("[SCHEDULER] Listening for jobs...")
+    client = connect_with_retry()
+    
+    receiver = client.get_queue_receiver(queue_name="jobqueue", max_wait_time=5)
+    
+    print("[SCHEDULER] Listening for jobs...", flush=True)
     try:
-        ch.start_consuming()
+        with receiver:
+            while True:
+                received_msgs = receiver.receive_messages(max_message_count=1, max_wait_time=5)
+                for msg in received_msgs:
+                    try:
+                        process_message(client, msg)
+                        receiver.complete_message(msg)
+                    except Exception as e:
+                        print(f"[SCHEDULER] Error processing message: {e}", flush=True)
+                        receiver.abandon_message(msg)
     except KeyboardInterrupt:
-        print("[SCHEDULER] Shutting down gracefully...")
-        ch.stop_consuming()
-        conn.close()
+        print("[SCHEDULER] Shutting down gracefully...", flush=True)
+        client.close()
 
 if __name__ == "__main__":
     main()

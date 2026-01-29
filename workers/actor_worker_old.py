@@ -1,29 +1,29 @@
-from azure.servicebus import ServiceBusClient
+import pika
 import json
 import time
 import os
 import sys
 
-SERVICEBUS_CONNECTION_STRING = os.getenv("SERVICEBUS_CONNECTION_STRING")
+RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
 QUEUE_NAME = "actor-jobs"
 MAX_RETRIES = 10
 RETRY_DELAY = 5
 
 def connect_with_retry():
-    """Connect to Service Bus with retries"""
+    """Connect to RabbitMQ with retries"""
     for attempt in range(MAX_RETRIES):
         try:
-            print(f"[ACTOR] Attempting to connect to Service Bus (attempt {attempt + 1}/{MAX_RETRIES})...", flush=True)
-            client = ServiceBusClient.from_connection_string(SERVICEBUS_CONNECTION_STRING)
-            print("[ACTOR] Successfully connected to Service Bus", flush=True)
-            return client
+            print(f"[ACTOR] Attempting to connect to RabbitMQ (attempt {attempt + 1}/{MAX_RETRIES})...", flush=True)
+            connection = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
+            print("[ACTOR] Successfully connected to RabbitMQ", flush=True)
+            return connection
         except Exception as e:
-            print(f"[ACTOR] Connection failed: {e}", flush=True)
+            print(f"[ACTOR] Connection failed: {e}")
             if attempt < MAX_RETRIES - 1:
-                print(f"[ACTOR] Retrying in {RETRY_DELAY} seconds...", flush=True)
+                print(f"[ACTOR] Retrying in {RETRY_DELAY} seconds...")
                 time.sleep(RETRY_DELAY)
             else:
-                print("[ACTOR] Max retries reached. Exiting.", flush=True)
+                print("[ACTOR] Max retries reached. Exiting.")
                 sys.exit(1)
 
 def process_job(job: dict):
