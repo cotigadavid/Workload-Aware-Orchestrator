@@ -1,8 +1,14 @@
 from azure.servicebus import ServiceBusClient
+from prometheus_client import Counter, Histogram, start_http_server
 import json
 import time
 import os
 import sys
+
+# Prometheus metrics
+jobs_processed = Counter('jobs_processed_total', 'Total jobs processed', ['worker_type'])
+job_processing_duration = Histogram('job_processing_duration_seconds', 'Job processing time', ['worker_type'])
+job_errors = Counter('job_errors_total', 'Total job errors', ['worker_type'])
 
 SERVICEBUS_CONNECTION_STRING = os.getenv("SERVICEBUS_CONNECTION_STRING")
 QUEUE_NAME = "actor-jobs"
@@ -28,6 +34,7 @@ def connect_with_retry():
 
 def process_job(job: dict):
     """Process actor job - low latency, lightweight tasks"""
+    start_time = time.time()
     job_id = job.get("job_id", "unknown")
     payload = job.get("payload", {})
     
@@ -37,7 +44,11 @@ def process_job(job: dict):
     # Simulate processing
     time.sleep(1)
     
-    print(f"[ACTOR] Completed job {job_id}", flush=True)
+    duration = time.time() - start_time
+    job_processing_duration.labels(worker_type='actor').observe(duration)
+    jobs_processed.labels(worker_type='actor').inc()
+    
+    print(f"[ACTOR] Completed job {job_id} in {duration:.2f}s", flush=True)
 
 def process_message(receiver, msg):
     try:
@@ -46,11 +57,16 @@ def process_message(receiver, msg):
         receiver.complete_message(msg)
     except Exception as e:
         print(f"[ACTOR] Error: {e}", flush=True)
+        job_errors.labels(worker_type='actor').inc()
         receiver.abandon_message(msg)
 
 def main():
     print("[ACTOR] Starting actor worker...", flush=True)
     print(f"[ACTOR] Service Bus connection configured", flush=True)
+    
+    # Start Prometheus metrics server
+    start_http_server(8002)
+    print("[ACTOR] Metrics server started on port 8002", flush=True)
     
     client = connect_with_retry()
     receiver = client.get_queue_receiver(queue_name=QUEUE_NAME, max_wait_time=5)

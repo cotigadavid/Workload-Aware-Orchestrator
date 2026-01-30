@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: <ACR_LOGIN_SERVER>/cloud-api:latest
+        image: orchestratoracr123.azurecr.io/cloud-api:latest
         imagePullPolicy: Always
         ports:
           - containerPort: 8000
@@ -67,7 +67,7 @@ spec:
     spec:
       containers:
       - name: scheduler
-        image: <ACR_LOGIN_SERVER>/cloud-scheduler:latest
+        image: orchestratoracr123.azurecr.io/cloud-scheduler:latest
         imagePullPolicy: Always
         env:
           - name: SERVICEBUS_CONNECTION_STRING
@@ -80,6 +80,30 @@ spec:
               secretKeyRef:
                 name: storage-conn
                 key: AZURE_STORAGE_CONNECTION_STRING
+          - name: BATCH_ACCOUNT_NAME
+            valueFrom:
+              secretKeyRef:
+                name: batch-credentials
+                key: BATCH_ACCOUNT_NAME
+                optional: true
+          - name: BATCH_ACCOUNT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: batch-credentials
+                key: BATCH_ACCOUNT_KEY
+                optional: true
+          - name: BATCH_ACCOUNT_URL
+            valueFrom:
+              secretKeyRef:
+                name: batch-credentials
+                key: BATCH_ACCOUNT_URL
+                optional: true
+          - name: APPINSIGHTS_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: appinsights-conn
+                key: connection-string
+                optional: true
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -98,7 +122,7 @@ spec:
     spec:
       containers:
       - name: worker
-        image: <ACR_LOGIN_SERVER>/cloud-actor-worker:latest
+        image: orchestratoracr123.azurecr.io/cloud-actor-worker:latest
         imagePullPolicy: Always
         env:
           - name: SERVICEBUS_CONNECTION_STRING
@@ -136,7 +160,7 @@ spec:
     spec:
       containers:
       - name: worker
-        image: <ACR_LOGIN_SERVER>/cloud-spark-worker:latest
+        image: orchestratoracr123.azurecr.io/cloud-spark-worker:latest
         imagePullPolicy: Always
         env:
           - name: SERVICEBUS_CONNECTION_STRING

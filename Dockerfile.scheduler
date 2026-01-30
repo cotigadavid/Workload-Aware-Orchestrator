@@ -3,7 +3,9 @@ FROM python:3.11-slim
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 
-RUN pip install azure-servicebus
+RUN pip install azure-servicebus azure-batch opencensus-ext-azure opencensus-ext-logging
+
 COPY scheduler/main.py .
+COPY scheduler/batch_submitter.py .
 
 CMD ["python", "-u", "main.py"]
