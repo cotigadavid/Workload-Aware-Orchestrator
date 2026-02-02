@@ -91,7 +91,7 @@ def classify(job: dict) -> tuple:
     elif score > 4:
         return ("aks", "ml-jobs")
     else:
-        return ("aks", "batch-jobs")
+        return ("aks", "actor-jobs")
 
 def route_job(client, job: dict, platform: str, target: str):
     job_id = job.get('job_id', 'unknown')
